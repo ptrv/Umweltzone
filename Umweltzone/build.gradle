@@ -113,6 +113,7 @@ dependencies {
     compile 'com.fasterxml.jackson.core:jackson-databind:2.6.4'
     compile 'de.cketti.library.changelog:ckchangelog:1.2.2'
     compile 'info.metadude.android:typed-preferences:2.1.0'
+    compile 'com.cocoahero.android:geojson:1.0.1@jar'
     compile fileTree(dir: 'libs', include: '*.jar')
 
     // Unit tests

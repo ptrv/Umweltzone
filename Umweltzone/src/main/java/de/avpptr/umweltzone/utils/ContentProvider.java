@@ -17,22 +17,29 @@
 
 package de.avpptr.umweltzone.utils;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.fasterxml.jackson.databind.type.CollectionType;
-import com.fasterxml.jackson.databind.type.TypeFactory;
-
-import org.ligi.tracedroid.logging.Log;
-
 import android.content.Context;
 import android.content.res.Resources;
 import android.support.annotation.NonNull;
 import android.support.annotation.RawRes;
 import android.support.v4.util.LruCache;
 
+import com.cocoahero.android.geojson.Feature;
+import com.cocoahero.android.geojson.FeatureCollection;
+import com.cocoahero.android.geojson.GeoJSON;
+import com.cocoahero.android.geojson.GeoJSONObject;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.databind.type.CollectionType;
+import com.fasterxml.jackson.databind.type.TypeFactory;
+
+import org.json.JSONException;
+import org.ligi.tracedroid.logging.Log;
+
 import java.io.IOException;
 import java.io.InputStream;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -71,7 +78,7 @@ public abstract class ContentProvider {
 
     @NonNull
     public static List<LowEmissionZone> getLowEmissionZones(final Context context) {
-        return getContent(context, "zones_de", LowEmissionZone.class);
+        return getGeoJsonContent(context, "zones_de", LowEmissionZone.class);
     }
 
     @NonNull
@@ -83,6 +90,37 @@ public abstract class ContentProvider {
             CIRCUITS_CACHE.put(keyForZone, circuits);
         }
         return circuits;
+    }
+
+    private static <T> List<T> getGeoJsonContent(Context context, String fileName, Class<T> contentType) {
+        int rawResourceId = getResourceId(context, fileName, "raw");
+        InputStream inputStream = context.getResources().openRawResource(rawResourceId);
+
+        try {
+            GeoJSONObject geoJSON = GeoJSON.parse(inputStream);
+            if (LowEmissionZone.class == contentType) {
+                List<LowEmissionZone> lezList = new ArrayList<>();
+                if (geoJSON.getType() == GeoJSON.TYPE_FEATURE_COLLECTION) {
+                    FeatureCollection featureCollection = (FeatureCollection) geoJSON;
+                    for (Feature feature : featureCollection.getFeatures()) {
+                        LowEmissionZone lez = LowEmissionZone.fromGeoJsonFeature(context, feature);
+                        lezList.add(lez);
+                    }
+                }
+                return (List<T>) lezList;
+            } else if (Circuit.class == contentType) {
+                List<Circuit> circuits = new ArrayList<>();
+
+                return (List<T>) circuits;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (JSONException e) {
+            e.printStackTrace();
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+        return Collections.EMPTY_LIST;
     }
 
     private static String generateKeyForZoneWith(String zoneName) {

@@ -20,8 +20,20 @@ package de.avpptr.umweltzone.models;
 import android.content.Context;
 import android.support.annotation.Nullable;
 
+import com.cocoahero.android.geojson.Feature;
+import com.cocoahero.android.geojson.MultiPoint;
+import com.cocoahero.android.geojson.Position;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 import de.avpptr.umweltzone.R;
 import de.avpptr.umweltzone.Umweltzone;
@@ -30,6 +42,7 @@ import de.avpptr.umweltzone.contract.LowEmissionZoneNumbers;
 import de.avpptr.umweltzone.prefs.PreferencesHelper;
 import de.avpptr.umweltzone.utils.BoundingBox;
 import de.avpptr.umweltzone.utils.ContentProvider;
+import de.avpptr.umweltzone.utils.GeoPoint;
 
 public class LowEmissionZone {
 
@@ -120,4 +133,66 @@ public class LowEmissionZone {
                 ", geometryUpdatedAt: " + geometryUpdatedAt;
     }
 
+    public static LowEmissionZone fromGeoJsonFeature(Context context, Feature feature) throws JSONException, ParseException {
+        LowEmissionZone lez = new LowEmissionZone();
+        MultiPoint boundingBox = (MultiPoint) feature.getGeometry();
+        List<Position> positions = boundingBox.getPositions();
+        lez.boundingBox = new BoundingBox(
+                new GeoPoint(positions.get(0).getLatitude(), positions.get(0).getLongitude()),
+                new GeoPoint(positions.get(1).getLatitude(), positions.get(1).getLongitude()));
+        JSONObject props = feature.getProperties();
+        lez.name = props.getString("name");
+        lez.displayName = props.getString("displayName");
+        JSONArray listOfCities = props.getJSONArray("listOfCities");
+        lez.listOfCities = new ArrayList<>();
+        for (int i = 0; i < listOfCities.length(); ++i) {
+            lez.listOfCities.add(listOfCities.getString(i));
+        }
+        switch (props.getInt("zoneNumber")) {
+            case 2:
+                lez.zoneNumber = LowEmissionZoneNumbers.RED;
+                break;
+            case 3:
+                lez.zoneNumber = LowEmissionZoneNumbers.YELLOW;
+                break;
+            case 4:
+                lez.zoneNumber = LowEmissionZoneNumbers.GREEN;
+                break;
+        }
+
+        String datePattern = context.getString(R.string.config_zone_number_since_date_format);
+        SimpleDateFormat dateFormat = new SimpleDateFormat(datePattern, Locale.getDefault());
+        String zoneNumberSinceStr = props.getString("zoneNumberSince");
+        if (zoneNumberSinceStr.length() != 0) {
+            lez.zoneNumberSince = dateFormat.parse(zoneNumberSinceStr);
+        }
+        String nextZoneNumberAsOfStr = props.getString("nextZoneNumberAsOf");
+        if (nextZoneNumberAsOfStr.length() != 0) {
+            lez.nextZoneNumberAsOf = dateFormat.parse(nextZoneNumberAsOfStr);
+        }
+        String abroadLicensedVehicleZoneNumberUntilStr =
+                props.getString("abroadLicensedVehicleZoneNumberUntil");
+        if (abroadLicensedVehicleZoneNumberUntilStr.length() != 0) {
+            lez.abroadLicensedVehicleZoneNumberUntil =
+                    dateFormat.parse(abroadLicensedVehicleZoneNumberUntilStr);
+        }
+        String geometryUpdatedAtStr = props.getString("geometryUpdatedAt");
+        if (geometryUpdatedAtStr.length() != 0) {
+            lez.geometryUpdatedAt = dateFormat.parse(geometryUpdatedAtStr);
+        }
+
+        lez.abroadLicensedVehicleZoneNumber = props.getInt("abroadLicensedVehicleZoneNumber");
+        lez.urlUmweltPlaketteDe = props.getString("urlUmweltPlaketteDe");
+        lez.urlBadgeOnline = props.getString("urlBadgeOnline");
+        lez.geometrySource = props.getString("geometrySource");
+        if (!props.isNull("contactEmails")) {
+            JSONArray contactEmails = props.getJSONArray("contactEmails");
+            lez.contactEmails = new ArrayList<>();
+            for (int i = 0; i < contactEmails.length(); i++) {
+                lez.contactEmails.add(contactEmails.getString(i));
+            }
+        }
+
+        return lez;
+    }
 }
